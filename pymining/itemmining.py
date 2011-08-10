@@ -27,8 +27,12 @@ class Transaction(object):
     def __len__(self):
         return len(self.seq) - self.current_pos
 
+    def inner_len(self):
+        return len(self.seq)
+
     def __str__(self):
-        return 'Pos: {0}\nSeq:{1}'.format(self.current_pos, self.seq)
+        return 'Pos: {0} - Seq:{1}\n'.format(self.current_pos,
+                self.seq[self.current_pos:])
 
     def __repr__(self):
         return self.__str__()
@@ -75,8 +79,8 @@ class SamInput(object):
         return size
 
     def __str__(self):
-        return 'Pos: {0}, End: {1}\nTuples:{2}'.format(self.current_pos,
-                self.end_pos, self.tuples)
+        return 'Pos: {0}, End: {1} - Tuples:{2}\n'.format(self.current_pos,
+                self.end_pos, self.tuples[self.current_pos:self.end_pos+1])
 
     def __repr__(self):
         return self.__str__()
@@ -92,13 +96,16 @@ class SamInput(object):
 
 def compare(t1, t2):
     '''Returns r < 1 if t1 < t2, r > 1 if t2 > t1, and r == 0 if t1 == t2'''
+    #print('Comparing {0} with {1}'.format(t1, t2))
     c1= t1.current_pos
     c2 = t2.current_pos
-    s1 = len(t1)
-    s2 = len(t2)
+    s1 = t1.inner_len()
+    s2 = t2.inner_len()
+    #print('Len t1={0}, Len t2={1}'.format(s1, s2))
     while c1 < s1 and c2 < s2:
         v1 = t1.seq[c1]
         v2 = t2.seq[c2]
+        #print('  compare v1={0} and v2={1}'.format(v1, v2))
         if v1 < v2:
             return -1
         elif v1 > v2:
@@ -270,11 +277,13 @@ def sam(sam_data, fis, min_support, frequencies):
     return n
 
 
-# Fix a problem... probably by looking a sam_input you'll fix it...
+# Fix a problem... Only the last ones seem problematic...
 def sam2(sam_input, fis, min_support):
     n = 0
+    # This only creates list of list of ptrs. Keys are never copied.
     a = sam_input.copy()
     while len(a) > 0 and len(a.first_item()) > 0:
+        #print('Looping on a={0}'.format(sam_input))
         b = SamInput([])
         s = 0
         i = a.first_item().trans.first_item()
@@ -286,8 +295,10 @@ def sam2(sam_input, fis, min_support):
                 b.append(a.popleft())
             else:
                 a.popleft()
+        #print('After split:\na={0}\nb={1}\n'.format(a, b))
         d = SamInput(a.tuples, 0, -1)
         c = SamInput(b.tuples, b.current_pos, b.end_pos)
+        # BUG HERE: At this stage, b.trans.current_pos == b.__len__... 
         while len(a) > 0 and len(b) > 0:
             cmp_val = compare(a.first_item().trans, b.first_item().trans)
             if cmp_val > 0:
@@ -301,6 +312,7 @@ def sam2(sam_input, fis, min_support):
                 d.append(cell)
                 b.popleft()
                 a.popleft()
+        #print('After half-merge:\na={0}\nb={1}\nd={2}\n'.format(a, b, d))
         while len(a) > 0:
             d.append(a.popleft())
         while len(b) > 0:
@@ -312,6 +324,7 @@ def sam2(sam_input, fis, min_support):
             print('{0} with support {1}'.format(fis, s))
             n = n + 1 + sam2(c, fis, min_support)
             fis.remove(i)
+        #print('Looping. a={0}'.format(a))
 
     return n
 
