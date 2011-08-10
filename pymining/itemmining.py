@@ -1,5 +1,8 @@
 from collections import defaultdict, deque, namedtuple
-import sys
+import string
+from timeit import timeit
+from time import time
+import random
 
 CountTrans = namedtuple('CountT', ['count', 'trans'])
 
@@ -96,16 +99,13 @@ class SamInput(object):
 
 def compare(t1, t2):
     '''Returns r < 1 if t1 < t2, r > 1 if t2 > t1, and r == 0 if t1 == t2'''
-    #print('Comparing {0} with {1}'.format(t1, t2))
     c1= t1.current_pos
     c2 = t2.current_pos
     s1 = t1.inner_len()
     s2 = t2.inner_len()
-    #print('Len t1={0}, Len t2={1}'.format(s1, s2))
     while c1 < s1 and c2 < s2:
         v1 = t1.seq[c1]
         v2 = t2.seq[c2]
-        #print('  compare v1={0} and v2={1}'.format(v1, v2))
         if v1 < v2:
             return -1
         elif v1 > v2:
@@ -113,7 +113,7 @@ def compare(t1, t2):
         c1 += 1
         c2 += 1
 
-    return s1 - s2
+    return len(t1) - len(t2)
 
 
 def get_frequencies(transactions):
@@ -132,6 +132,8 @@ def get_sam_input(sequences, key_func):
 
     asorted_seqs = []
     for key_seq in key_seqs:
+        if len(key_seq) == 0:
+            continue
         # Sort each transaction (infrequent key first)
         l = [(frequencies[i], i) for i in key_seq]
         l.sort()
@@ -192,6 +194,8 @@ def get_sam_data(transactions):
     visited = {}
     current = 0
     for transaction in transactions:
+        if len(transaction) == 0:
+            continue
         key = str(transaction)
         if key not in visited:
             sam_data.append((1, transaction))
@@ -222,7 +226,7 @@ def lexi_repr(transaction, frequencies):
 # cd is reported twice with different values
 # b and d are wrong.
 # again, look at the return value (debug -1)
-def sam(sam_data, fis, min_support, frequencies):
+def sam(sam_data, fis, report, min_support, frequencies):
     #print('Debug -1: sam_data={0}, fis={1}'.format(sam_data, fis))
     n = 0
     # Will contain everything, but some transactions will be pruned from their
@@ -269,25 +273,25 @@ def sam(sam_data, fis, min_support, frequencies):
         a = deque(d)
         if s >= min_support:
             fis.add(i)
-            print('{0} with support {1}'.format(fis, s))
-            n = n + 1 + sam(c, fis, min_support, frequencies)
+            #print('{0} with support {1}'.format(fis, s))
+            report.add((frozenset(fis), s))
+            n = n + 1 + sam(c, fis, report, min_support, frequencies)
             fis.remove(i)
         #print('LOOPING with a={0}'.format(a))
 
     return n
 
 
-# Fix a problem... Only the last ones seem problematic...
-def sam2(sam_input, fis, min_support):
+def sam2(sam_input, fis, report, min_support):
     n = 0
     # This only creates list of list of ptrs. Keys are never copied.
     a = sam_input.copy()
-    while len(a) > 0 and len(a.first_item()) > 0:
-        #print('Looping on a={0}'.format(sam_input))
+    while len(a) > 0 and len(a.first_item().trans) > 0:
+        #print('Looping on a={0}'.format(a))
         b = SamInput([])
         s = 0
         i = a.first_item().trans.first_item()
-        while len(a) > 0 and len(a.first_item()) > 0 and \
+        while len(a) > 0 and len(a.first_item().trans) > 0 and \
                 a.first_item().trans.first_item() == i:
             s = s + a.first_item().count
             a.first_item().trans.minus_first()
@@ -321,23 +325,87 @@ def sam2(sam_input, fis, min_support):
         a = d
         if s >= min_support:
             fis.add(i)
-            print('{0} with support {1}'.format(fis, s))
-            n = n + 1 + sam2(c, fis, min_support)
+            report.add((frozenset(fis), s))
+            #print('{0} with support {1}'.format(fis, s))
+            n = n + 1 + sam2(c, fis, report, min_support)
             fis.remove(i)
         #print('Looping. a={0}'.format(a))
 
     return n
 
 
-def test_sam():
-    ts = get_default_transactions()
+def test_sam(should_print=False, ts=None):
+    if ts is None:
+        ts = get_default_transactions()
     sam_data, frequencies = transform(ts)
     fis = set()
-    return sam(sam_data, fis, 2, frequencies)
+    report = set()
+    n = sam(sam_data, fis, report, 2, frequencies)
+    if should_print:
+        print(n)
+        print(report)
+
+    return (n, report)
 
 
-def test_sam2():
-    sample = get_default_transactions()
-    sam_input = get_sam_input(sample, lambda e: e)
+def test_sam2(should_print=False, ts=None):
+    if ts is None:
+        ts = get_default_transactions()
+    sam_input = get_sam_input(ts, lambda e: e)
     fis = set()
-    return sam2(sam_input, fis, 2)
+    report = set()
+    n = sam2(sam_input, fis, report, 2)
+    if should_print:
+        print(n)
+        print(report)
+
+    return (n, report)
+
+def testperf():
+    print(timeit('test_sam()', 'from pymining.itemmining import test_sam',
+        number=100))
+    print(timeit('test_sam2()', 'from pymining.itemmining import test_sam2',
+        number=100))
+
+def testperf2():
+    SECTIONS_NUMBER = 100
+    MAX_ITEMS_PER_SECTION = 50
+    MAX_WORD_LENGTH = 20
+    KEY_ALPHABET = string.ascii_letters
+    MAX_WORDS = 1000
+    ROUND = 10
+    
+    words = []
+    for _ in range(MAX_WORDS): 
+
+        word = ''.join((random.choice(KEY_ALPHABET) for x in
+            range(random.randint(1, MAX_WORD_LENGTH))))
+        words.append(word)
+
+    sections = []
+    for _ in range(SECTIONS_NUMBER):
+        section = {word for word in random.sample(words, random.randint(0,
+            MAX_ITEMS_PER_SECTION))}
+        sections.append(section)
+
+    print('SECTIONS COMPLETED:\n')
+    #print(sections)
+    #print()
+
+    start = time()
+    for i in range(ROUND):
+        (n, report) = test_sam(False, sections)
+        print('Done round {0}'.format(i))
+    end = time()
+    print('Sam took: {0}'.format(end-start))
+    print(n)
+    #print(report)
+
+    start = time()
+    for i in range(ROUND):
+        (n, report) = test_sam2(False, sections)
+        print('Done round {0}'.format(i))
+    end = time()
+    print('Sam2 took: {0}'.format(end-start))
+    print(n)
+    #print(report)
