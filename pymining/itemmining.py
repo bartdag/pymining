@@ -124,6 +124,38 @@ def get_frequencies(transactions):
     return frequencies
 
 
+def get_sam3_input(sequences, key_func):
+    key_seqs = [[key_func(i) for i in sequence] for sequence in sequences]
+    # Get frequencies of individual keys
+    frequencies = get_frequencies(key_seqs)
+
+    asorted_seqs = []
+    for key_seq in key_seqs:
+        if len(key_seq) == 0:
+            continue
+        # Sort each transaction (infrequent key first)
+        l = [(frequencies[i], i) for i in key_seq]
+        l.sort()
+        asorted_seqs.append(tuple(l))
+    # Sort all transactions. Those with infrequent key first, first
+    asorted_seqs.sort()
+
+    # Group same transactions together
+    sam_input = deque()
+    visited = {}
+    current = 0
+    for seq in asorted_seqs:
+        if seq not in visited:
+            sam_input.append((1, seq))
+            visited[seq] = current
+            current += 1
+        else:
+            i = visited[seq]
+            (count, oldseq) = sam_input[i]
+            sam_input[i] = (count + 1, oldseq)
+    return sam_input
+
+
 def get_sam_input(sequences, key_func):
     key_seqs = [[key_func(i) for i in sequence] for sequence in sequences]
 
@@ -222,10 +254,48 @@ def transform(transactions):
 def lexi_repr(transaction, frequencies):
     return [(frequencies[i], i) for i in transaction]
 
-# ALMOST, but ad should be four
-# cd is reported twice with different values
-# b and d are wrong.
-# again, look at the return value (debug -1)
+
+def sam3(sam_input, fis, report, min_support):
+    n = 0
+    a = deque(sam_input)
+    while len(a) > 0 and len(a[0][1]) > 0:
+        b = deque()
+        s = 0
+        i = a[0][1][0]
+        while len(a) > 0 and len(a[0][1]) > 0 and a[0][1][0] == i:
+            s = s + a[0][0]
+            a[0] = (a[0][0], a[0][1][1:])
+            if len(a[0][1]) > 0:
+                b.append(a.popleft())
+            else:
+                a.popleft()
+        c = deque(b)
+        d = deque()
+        while len(a) > 0 and len(b) > 0:
+            if a[0][1] > b[0][1]:
+                d.append(b.popleft())
+            elif a[0][1] < b[0][1]:
+                d.append(a.popleft())
+            else:
+                b[0] = (b[0][0] + a[0][0], b[0][1])
+                d.append(b.popleft())
+                a.popleft()
+        while len(a) > 0:
+            d.append(a.popleft())
+        while len(b) > 0:
+            d.append(b.popleft())
+        # Not necessary I think
+        #a = deque(d)
+        a = d
+        if s >= min_support:
+            fis.add(i)
+            report.add((frozenset(fis), s))
+            #print('{0} with support {1}'.format(fis, s))
+            n = n + 1 + sam3(c, fis, report, min_support)
+            fis.remove(i)
+    return n
+
+
 def sam(sam_data, fis, report, min_support, frequencies):
     #print('Debug -1: sam_data={0}, fis={1}'.format(sam_data, fis))
     n = 0
@@ -334,13 +404,13 @@ def sam2(sam_input, fis, report, min_support):
     return n
 
 
-def test_sam(should_print=False, ts=None):
+def test_sam(should_print=False, ts=None, support=2):
     if ts is None:
         ts = get_default_transactions()
     sam_data, frequencies = transform(ts)
     fis = set()
     report = set()
-    n = sam(sam_data, fis, report, 2, frequencies)
+    n = sam(sam_data, fis, report, support, frequencies)
     if should_print:
         print(n)
         print(report)
@@ -348,13 +418,26 @@ def test_sam(should_print=False, ts=None):
     return (n, report)
 
 
-def test_sam2(should_print=False, ts=None):
+def test_sam3(should_print=False, ts=None, support=2):
+    if ts is None:
+        ts = get_default_transactions()
+    sam_input = get_sam3_input(ts, lambda e: e)
+    fis = set()
+    report = set()
+    n = sam3(sam_input, fis, report, support)
+    if should_print:
+        print(n)
+        print(report)
+    return (n, report)
+
+
+def test_sam2(should_print=False, ts=None, support=2):
     if ts is None:
         ts = get_default_transactions()
     sam_input = get_sam_input(ts, lambda e: e)
     fis = set()
     report = set()
-    n = sam2(sam_input, fis, report, 2)
+    n = sam2(sam_input, fis, report, support)
     if should_print:
         print(n)
         print(report)
@@ -368,9 +451,9 @@ def testperf():
         number=100))
 
 def testperf2():
-    SECTIONS_NUMBER = 100
-    MAX_ITEMS_PER_SECTION = 50
-    MAX_WORD_LENGTH = 20
+    SECTIONS_NUMBER = 250
+    MAX_ITEMS_PER_SECTION = 100
+    MAX_WORD_LENGTH = 50
     KEY_ALPHABET = string.ascii_letters
     MAX_WORDS = 1000
     ROUND = 10
@@ -392,18 +475,29 @@ def testperf2():
     #print(sections)
     #print()
 
+
     start = time()
     for i in range(ROUND):
-        (n, report) = test_sam(False, sections)
+        (n, report) = test_sam3(False, sections, 10)
+        print('Done round {0}'.format(i))
+    end = time()
+    print('Sam3 took: {0}'.format(end-start))
+    print(n)
+    #print(report)
+
+    start = time()
+    for i in range(ROUND):
+        (n, report) = test_sam(False, sections, 10)
         print('Done round {0}'.format(i))
     end = time()
     print('Sam took: {0}'.format(end-start))
     print(n)
     #print(report)
 
+
     start = time()
     for i in range(ROUND):
-        (n, report) = test_sam2(False, sections)
+        (n, report) = test_sam2(False, sections, 10)
         print('Done round {0}'.format(i))
     end = time()
     print('Sam2 took: {0}'.format(end-start))
