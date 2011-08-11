@@ -326,9 +326,8 @@ class FPNode(object):
         self.count = 0
         self.next_node = None
 
-    def add_path(self, path, index, length, last_insert, likely_leaves):
+    def add_path(self, path, index, length, heads, last_insert):
         if index >= length:
-            likely_leaves.add(self)
             return
 
         child_key = path[index]
@@ -337,19 +336,19 @@ class FPNode(object):
         try:
             child = self.children[child_key]
         except Exception:
-            child = self._create_child(child_key, last_insert)
+            child = self._create_child(child_key, heads, last_insert)
         child.count += 1
 
-        child.add_path(path, index, length, last_insert, likely_leaves)
+        child.add_path(path, index, length, heads, last_insert)
 
-    def _create_child(self, child_key, last_insert):
+    def _create_child(self, child_key, heads, last_insert):
         child = FPNode(child_key, self)
         self.children[child_key] = child
         try:
             last_child = last_insert[child_key]
             last_child.next_node = child
         except Exception:
-            pass
+            heads[child_key] = child
         last_insert[child_key] = child
 
         return child
@@ -364,21 +363,20 @@ class FPNode(object):
 
 
 def get_fptree(transactions, key_func, min_support=2):
-    asorted_seqs, _ = _sort_transactions_by_freq(transactions, key_func, True,
+    asorted_seqs, frequencies = _sort_transactions_by_freq(transactions, key_func, True,
             False, False)
     transactions = [[item[1] for item in aseq if item[0] >= min_support] for
             aseq in asorted_seqs]
 
     root = FPNode(None, None)
+    heads = {}
     last_insert = {}
-    likely_leaves = set()
     for transaction in transactions:
-        root.add_path(transaction, 0, len(transaction), last_insert,
-                likely_leaves)
+        root.add_path(transaction, 0, len(transaction), heads, last_insert)
+                
+    new_heads = sorted(heads.values(), key=lambda v: frequencies[v.key])
 
-    leaves = [node for node in likely_leaves if len(node.children) == 0]
-
-    return (root, leaves)
+    return (root, new_heads)
 
 
 def _print_prefix_tree(node):
