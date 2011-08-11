@@ -73,6 +73,23 @@ def compare(t1, t2):
     return len(t1) - len(t2)
 
 
+def _sort_transactions_by_freq(transactions, key_func):
+    key_seqs = [[key_func(i) for i in sequence] for sequence in transactions]
+    frequencies = get_frequencies(key_seqs)
+
+    asorted_seqs = []
+    for key_seq in key_seqs:
+        if len(key_seq) == 0:
+            continue
+        # Sort each transaction (infrequent key first)
+        l = [(frequencies[i], i) for i in key_seq]
+        l.sort()
+        asorted_seqs.append(tuple(l))
+    # Sort all transactions. Those with infrequent key first, first
+    asorted_seqs.sort()
+
+    return asorted_seqs
+
 def get_frequencies(transactions):
     '''Computes a dictionary, {key:frequencies} containing the frequency of
        each key in all transactions. Duplicate keys in a transaction are
@@ -95,20 +112,7 @@ def get_sam_input(transactions, key_func):
        :param key_func: a function that returns a comparable key for a
         transaction item.
     '''
-    key_seqs = [[key_func(i) for i in sequence] for sequence in transactions]
-    # Get frequencies of individual keys
-    frequencies = get_frequencies(key_seqs)
-
-    asorted_seqs = []
-    for key_seq in key_seqs:
-        if len(key_seq) == 0:
-            continue
-        # Sort each transaction (infrequent key first)
-        l = [(frequencies[i], i) for i in key_seq]
-        l.sort()
-        asorted_seqs.append(tuple(l))
-    # Sort all transactions. Those with infrequent key first, first
-    asorted_seqs.sort()
+    asorted_seqs = _sort_transactions_by_freq(transactions, key_func)
 
     # Group same transactions together
     sam_input = deque()
@@ -185,6 +189,41 @@ def test_sam(should_print=False, ts=None, support=2):
         print(n)
         print(report)
     return (n, report)
+
+
+def get_relim_input(transactions, key_func):
+    '''Given a list of transactions and a key function, returns a data
+       structure used as the input of the relim algorithm.
+
+       :param transactions: a sequence of sequences. [ [transaction items...]]
+       :param key_func: a function that returns a comparable key for a
+        transaction item.
+    '''
+    asorted_seqs = _sort_transactions_by_freq(transactions, key_func)
+    relim_input = []
+    for seq in asorted_seqs:
+        if len(seq) < 2:
+            continue
+        if len(relim_input) > 0 and relim_input[-1][0][1] == seq[0]:
+            ((count, char), lists) = relim_input[-1]
+            rest = seq[1:]
+            found = False
+            for i, (rest_count, rest_seq) in enumerate(lists):
+                if rest_seq == rest:
+                    lists[i] = (rest_count + 1, rest_seq)
+                    found = True
+                    break
+            if not found:
+                lists.append((1, rest))
+            relim_input[-1] = ((count + 1, char), lists)
+        else:
+            relim_input.append(((1, seq[0]), [(1, seq[1:])] ))
+        # Take first tuple
+        # If firm tuple == current, just add to the list.
+        #    If last == current, just increment counter.
+        #    # Ohterwise, just add a new one.
+        # Otherwise, create a new one.
+    return deque(reversed(relim_input))
 
 
 def testperf(perf_round=10):
