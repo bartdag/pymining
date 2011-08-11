@@ -1,4 +1,4 @@
-from collections import defaultdict, deque
+from collections import defaultdict, deque, OrderedDict
 import string
 from time import time
 import random
@@ -88,7 +88,7 @@ def _sort_transactions_by_freq(transactions, key_func):
     # Sort all transactions. Those with infrequent key first, first
     asorted_seqs.sort()
 
-    return asorted_seqs
+    return (asorted_seqs, frequencies)
 
 def get_frequencies(transactions):
     '''Computes a dictionary, {key:frequencies} containing the frequency of
@@ -112,7 +112,7 @@ def get_sam_input(transactions, key_func):
        :param key_func: a function that returns a comparable key for a
         transaction item.
     '''
-    asorted_seqs = _sort_transactions_by_freq(transactions, key_func)
+    (asorted_seqs, _) = _sort_transactions_by_freq(transactions, key_func)
 
     # Group same transactions together
     sam_input = deque()
@@ -191,6 +191,25 @@ def test_sam(should_print=False, ts=None, support=2):
     return (n, report)
 
 
+def _new_relim_input(size, key_map):
+    i = 0
+    l = []
+    for key in key_map:
+        if i >= size:
+            break
+        l.append(((0, key), []))
+    return l
+
+
+def _get_key_map(frequencies):
+    l = [(frequencies[k], k) for k in frequencies]
+    l.sort(reverse=True)
+    key_map = OrderedDict()
+    for i, v in enumerate(l):
+        key_map[v] = i
+    return key_map
+
+
 def get_relim_input(transactions, key_func):
     '''Given a list of transactions and a key function, returns a data
        structure used as the input of the relim algorithm.
@@ -199,34 +218,94 @@ def get_relim_input(transactions, key_func):
        :param key_func: a function that returns a comparable key for a
         transaction item.
     '''
-    asorted_seqs = _sort_transactions_by_freq(transactions, key_func)
-    relim_input = []
+
+    # Data Structure
+    # relim_input[x][0] = (count, key_freq)
+    # relim_input[x][1] = [(count, (key_freq, )]
+    #
+    # in other words:
+    # relim_input[x][0][0] = count of trans with prefix key_freq
+    # relim_input[x][0][1] = prefix key_freq
+    # relim_input[x][1] = lists of transaction rests
+    # relim_input[x][1][x][0] = number of times a rest of transaction appears
+    # relim_input[x][1][x][1] = rest of transaction prefixed by key_freq
+
+    (asorted_seqs, frequencies) = _sort_transactions_by_freq(transactions, key_func)
+    key_map = _get_key_map(frequencies)
+
+    relim_input = _new_relim_input(len(key_map), key_map)
     for seq in asorted_seqs:
         if len(seq) < 2:
             continue
-        if len(relim_input) > 0 and relim_input[-1][0][1] == seq[0]:
-            ((count, char), lists) = relim_input[-1]
-            rest = seq[1:]
-            found = False
-            for i, (rest_count, rest_seq) in enumerate(lists):
-                if rest_seq == rest:
-                    lists[i] = (rest_count + 1, rest_seq)
-                    found = True
-                    break
-            if not found:
-                lists.append((1, rest))
-            relim_input[-1] = ((count + 1, char), lists)
-        else:
-            relim_input.append(((1, seq[0]), [(1, seq[1:])] ))
-        # Take first tuple
-        # If firm tuple == current, just add to the list.
-        #    If last == current, just increment counter.
-        #    # Ohterwise, just add a new one.
-        # Otherwise, create a new one.
-    return deque(reversed(relim_input))
+        index = key_map[seq[0]]
+        ((count, char), lists) = relim_input[index]
+        rest = seq[1:]
+        found = False
+        for i, (rest_count, rest_seq) in enumerate(lists):
+            if rest_seq == rest:
+                lists[i] = (rest_count + 1, rest_seq)
+                found = True
+                break
+        if not found:
+            lists.append((1, rest))
+        relim_input[index] = ((count + 1, char), lists)
+    return (relim_input, key_map)
 
 
-def testperf(perf_round=10):
+def relim(rinput, fis, report, min_support):
+    (relim_input, key_map) = rinput
+    n = 0
+    # Maybe this one isn't necessary
+    a = deque(relim_input)
+    while len(a) > 0:
+        item = a[-1][0][1]
+        s = item[0]
+        if s >= min_support:
+            fis.add(item)
+            print('Report {0} with support {1}'.format(fis, s))
+            report.add((frozenset(fis), s))
+            b = _new_relim_input(len(a) - 1, key_map)
+            rest_lists = a[-1][1]
+
+            for (count, rest) in rest_lists:
+                k = rest[0]
+                index = key_map[k]
+                new_rest = rest[1:]
+                # Only add this rest if it's not empty!
+                ((k_count, k), lists) = b[index]
+                if len(new_rest) > 0:
+                    lists.append((count, new_rest))
+                b[index] = ((k_count + count, k), lists)
+            n = n + 1 + relim((b, key_map), fis, report, min_support)
+            fis.remove(item)
+        
+        rest_lists = a[-1][1]
+        for (count, rest) in rest_lists:
+            k = rest[0]
+            index = key_map[k]
+            new_rest = rest[1:]
+            ((k_count, k), lists) = a[index]
+            if len(new_rest) > 0:
+                lists.append((count, new_rest))
+            a[index] = ((k_count + count, k), lists)
+        a.pop()
+    return n
+
+
+def test_relim(should_print=False, ts=None, support=2):
+    if ts is None:
+        ts = get_default_transactions()
+    relim_input = get_relim_input(ts, lambda e: e)
+    fis = set()
+    report = set()
+    n = relim(relim_input, fis, report, support)
+    if should_print:
+        print(n)
+        print(report)
+    return (n, report)
+
+
+def test_perf(perf_round=10):
 
     transactions = get_random_transactions()
     print('Random transactions generated\n')
