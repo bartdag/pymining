@@ -5,6 +5,7 @@ import random
 import sys
 
 
+
 if sys.version_info[0] < 3:
     range = xrange
 
@@ -22,6 +23,21 @@ def get_default_transactions():
             ('b', 'c', 'd', 'e'),
             ('b', 'c'),
             ('a', 'b', 'd')
+            )
+
+def get_default_transactions_alt():
+    '''Returns a small list of transactions. For testing purpose.'''
+    return (
+            ('a', 'b'),
+            ('b', 'c', 'd'),
+            ('a','c', 'd', 'e'),
+            ('a', 'd', 'e'),
+            ('a', 'b', 'c'),
+            ('a', 'b', 'c', 'd'),
+            ('a'),
+            ('a', 'b', 'c'),
+            ('a', 'b', 'd'),
+            ('b', 'c', 'e'),
             )
 
 
@@ -54,8 +70,9 @@ def get_random_transactions(transaction_number=500,
     return transactions
 
 
-def _sort_transactions_by_freq(transactions, key_func):
-    key_seqs = [[key_func(i) for i in sequence] for sequence in transactions]
+def _sort_transactions_by_freq(transactions, key_func, reverse_int=False,
+        reverse_ext=False, sort_ext=True):
+    key_seqs = [{key_func(i) for i in sequence} for sequence in transactions]
     frequencies = get_frequencies(key_seqs)
 
     asorted_seqs = []
@@ -64,10 +81,11 @@ def _sort_transactions_by_freq(transactions, key_func):
             continue
         # Sort each transaction (infrequent key first)
         l = [(frequencies[i], i) for i in key_seq]
-        l.sort()
+        l.sort(reverse=reverse_int)
         asorted_seqs.append(tuple(l))
     # Sort all transactions. Those with infrequent key first, first
-    asorted_seqs.sort()
+    if sort_ext:
+        asorted_seqs.sort(reverse=reverse_ext)
 
     return (asorted_seqs, frequencies)
 
@@ -298,6 +316,75 @@ def test_relim(should_print=False, ts=None, support=2):
         print(n)
         print(report)
     return (n, report)
+
+
+class FPNode(object):
+    def __init__(self, key, parent):
+        self.children = {}
+        self.parent = parent
+        self.key = key
+        self.count = 0
+        self.next_node = None
+
+    def add_path(self, path, index, length, last_insert, likely_leaves):
+        if index >= length:
+            likely_leaves.add(self)
+            return
+
+        child_key = path[index]
+        index += 1
+
+        try:
+            child = self.children[child_key]
+        except Exception:
+            child = self._create_child(child_key, last_insert)
+        child.count += 1
+
+        child.add_path(path, index, length, last_insert, likely_leaves)
+
+    def _create_child(self, child_key, last_insert):
+        child = FPNode(child_key, self)
+        self.children[child_key] = child
+        try:
+            last_child = last_insert[child_key]
+            last_child.next_node = child
+        except Exception:
+            pass
+        last_insert[child_key] = child
+
+        return child
+
+    def __str__(self):
+        child_str = ','.join([str(key) for key in self.children])
+        return '{0} ({1})  [{2}]  {3}'.format(self.key, self.count, child_str,
+                self.next_node is not None)
+
+    def __repr__(self):
+        return self.__str__()
+
+
+def get_fptree(transactions, key_func, min_support=2):
+    asorted_seqs, _ = _sort_transactions_by_freq(transactions, key_func, True,
+            False, False)
+    transactions = [[item[1] for item in aseq if item[0] >= min_support] for
+            aseq in asorted_seqs]
+
+    root = FPNode(None, None)
+    last_insert = {}
+    likely_leaves = set()
+    for transaction in transactions:
+        root.add_path(transaction, 0, len(transaction), last_insert,
+                likely_leaves)
+
+    leaves = [node for node in likely_leaves if len(node.children) == 0]
+
+    return (root, leaves)
+
+
+def _print_prefix_tree(node):
+    print(node)
+    for key in sorted(node.children):
+        _print_prefix_tree(node.children[key])
 
 
 def test_perf(perf_round=10, sparse=True):
