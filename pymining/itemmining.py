@@ -319,6 +319,7 @@ def test_relim(should_print=False, ts=None, support=2):
 
 
 class FPNode(object):
+
     def __init__(self, key, parent):
         self.children = {}
         self.parent = parent
@@ -338,6 +339,7 @@ class FPNode(object):
         except Exception:
             child = self._create_child(child_key, heads, last_insert)
         child.count += 1
+        heads[child_key][1] += 1
 
         child.add_path(path, index, length, heads, last_insert)
 
@@ -348,10 +350,52 @@ class FPNode(object):
             last_child = last_insert[child_key]
             last_child.next_node = child
         except Exception:
-            heads[child_key] = child
+            heads[child_key] = [child, 0]
         last_insert[child_key] = child
 
         return child
+
+    def get_cond_tree(self, child, count, visited, heads, last_insert):
+
+        key = self.key
+        try:
+            cond_node = visited[self]
+        except Exception:
+            cond_node = self._create_cond_child(visited, heads, last_insert)
+
+        if child is not None:
+            cond_node.children[child.key] = child
+
+        if self.parent is not None:
+            cond_node.count += count
+            heads[key][1] += count
+            cond_node.parent = self.parent.get_cond_tree(cond_node, count, visited, 
+                    heads, last_insert)
+
+        return cond_node
+
+    def _create_cond_child(self, visited, heads, last_insert):
+        key = self.key
+        cond_node = FPNode(key, None) 
+        visited[self] = cond_node
+        try:
+            last_cond_node = last_insert[key]
+            last_cond_node.next_node = cond_node
+        except Exception:
+            # Don't add root!
+            if self.parent is not None:
+                heads[key] = [cond_node, 0]
+        last_insert[key] = cond_node
+
+        return cond_node
+
+    def prune_me(self):
+        parent = self.parent
+        del(parent.children[self.key])
+        for child_key in self.children:
+            child = self.children[child_key]
+            child.parent = parent
+            parent.children[child_key] = child
 
     def __str__(self):
         child_str = ','.join([str(key) for key in self.children])
@@ -360,7 +404,9 @@ class FPNode(object):
 
     def __repr__(self):
         return self.__str__()
+    
 
+# Optimization 1: add count of heads in heads.
 
 def get_fptree(transactions, key_func, min_support=2):
     asorted_seqs, frequencies = _sort_transactions_by_freq(transactions, key_func, True,
@@ -374,7 +420,7 @@ def get_fptree(transactions, key_func, min_support=2):
     for transaction in transactions:
         root.add_path(transaction, 0, len(transaction), heads, last_insert)
                 
-    new_heads = sorted(heads.values(), key=lambda v: frequencies[v.key])
+    new_heads = sorted(heads.values(), key=lambda v: (v[1], v[0].key))
 
     return (root, new_heads)
 
@@ -383,6 +429,21 @@ def _print_prefix_tree(node):
     print(node)
     for key in sorted(node.children):
         _print_prefix_tree(node.children[key])
+
+
+def _print_head(head):
+    node = head
+    while node is not None:
+        print(node)
+        node = node.parent
+
+
+def fpgrowth(fptree):
+    (root, heads) = fptree
+    # cond tree: done
+    # prune: done
+    # issue #1: which head to process first
+    # issue #2: do we cut and do we remove the children afterwards?
 
 
 def test_perf(perf_round=10, sparse=True):
