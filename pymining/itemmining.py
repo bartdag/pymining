@@ -25,21 +25,21 @@ def get_default_transactions():
             )
 
 
-def get_random_transactions(transaction_number=250,
+def get_random_transactions(transaction_number=500,
         max_item_per_transaction=100, max_key_length=50,
-        key_alphabet=None, universe_size = 1000):
+        key_alphabet=None, universe_size=1000):
     '''Generates a random list of `transaction_number` transactions containing
        from 0 to `max_item_per_transaction` from a collection of
        `universe_size`. Each key has a maximum length of `max_key_length` and
        is computed from a sequence of characters specified by `key_alphabet`
        (default is ascii letters).
     '''
-    
+
     if key_alphabet is None:
         key_alphabet = string.ascii_letters
 
     words = []
-    for _ in range(universe_size): 
+    for _ in range(universe_size):
 
         word = ''.join((random.choice(key_alphabet) for x in
             range(random.randint(1, max_key_length))))
@@ -52,25 +52,6 @@ def get_random_transactions(transaction_number=250,
         transactions.append(transaction)
 
     return transactions
-
-
-def compare(t1, t2):
-    '''Returns r < 1 if t1 < t2, r > 1 if t2 > t1, and r == 0 if t1 == t2'''
-    c1= t1.current_pos
-    c2 = t2.current_pos
-    s1 = t1.inner_len()
-    s2 = t2.inner_len()
-    while c1 < s1 and c2 < s2:
-        v1 = t1.seq[c1]
-        v2 = t2.seq[c2]
-        if v1 < v2:
-            return -1
-        elif v1 > v2:
-            return 1
-        c1 += 1
-        c2 += 1
-
-    return len(t1) - len(t2)
 
 
 def _sort_transactions_by_freq(transactions, key_func):
@@ -89,6 +70,7 @@ def _sort_transactions_by_freq(transactions, key_func):
     asorted_seqs.sort()
 
     return (asorted_seqs, frequencies)
+
 
 def get_frequencies(transactions):
     '''Computes a dictionary, {key:frequencies} containing the frequency of
@@ -131,8 +113,8 @@ def get_sam_input(transactions, key_func):
 
 
 def sam(sam_input, fis, report, min_support):
-    '''Finds frequent item sets of items appearing in a list of transactions based
-       on the Split and Merge algorithm by Christian Borgelt.
+    '''Finds frequent item sets of items appearing in a list of transactions
+       based on the Split and Merge algorithm by Christian Borgelt.
 
        :sam_input: The input of the algorithm. Must come from `get_sam_input`.
        :fis: An empty set used to temporarily stored the frequent item sets.
@@ -198,6 +180,7 @@ def _new_relim_input(size, key_map):
         if i >= size:
             break
         l.append(((0, key), []))
+        i = i + 1
     return l
 
 
@@ -230,7 +213,8 @@ def get_relim_input(transactions, key_func):
     # relim_input[x][1][x][0] = number of times a rest of transaction appears
     # relim_input[x][1][x][1] = rest of transaction prefixed by key_freq
 
-    (asorted_seqs, frequencies) = _sort_transactions_by_freq(transactions, key_func)
+    (asorted_seqs, frequencies) = _sort_transactions_by_freq(transactions,
+            key_func)
     key_map = _get_key_map(frequencies)
 
     relim_input = _new_relim_input(len(key_map), key_map)
@@ -253,16 +237,27 @@ def get_relim_input(transactions, key_func):
 
 
 def relim(rinput, fis, report, min_support):
+    '''Finds frequent item sets of items appearing in a list of transactions
+       based on Recursive Elimination algorithm by Christian Borgelt.
+
+       :rinput: The input of the algorithm. Must come from
+        `get_relim_input`.
+       :fis: An empty set used to temporarily stored the frequent item sets.
+       :report: A set that will contain the mined frequent item sets. Each set
+        in `report` contains tuples of (total freq. of item, key of item).
+       :min_support: The minimal support of a set to be included in `report`.
+    '''
     (relim_input, key_map) = rinput
     n = 0
     # Maybe this one isn't necessary
-    a = deque(relim_input)
+    #a = deque(relim_input)
+    a = relim_input
     while len(a) > 0:
         item = a[-1][0][1]
-        s = item[0]
+        s = a[-1][0][0]
         if s >= min_support:
             fis.add(item)
-            print('Report {0} with support {1}'.format(fis, s))
+            #print('Report {0} with support {1}'.format(fis, s))
             report.add((frozenset(fis), s))
             b = _new_relim_input(len(a) - 1, key_map)
             rest_lists = a[-1][1]
@@ -278,7 +273,7 @@ def relim(rinput, fis, report, min_support):
                 b[index] = ((k_count + count, k), lists)
             n = n + 1 + relim((b, key_map), fis, report, min_support)
             fis.remove(item)
-        
+
         rest_lists = a[-1][1]
         for (count, rest) in rest_lists:
             k = rest[0]
@@ -305,18 +300,34 @@ def test_relim(should_print=False, ts=None, support=2):
     return (n, report)
 
 
-def test_perf(perf_round=10):
+def test_perf(perf_round=10, sparse=True):
 
-    transactions = get_random_transactions()
+    if sparse:
+        universe_size = 2000
+        transaction_number = 500
+    else:
+        universe_size = 200
+        transaction_number = 100
+    transactions = get_random_transactions(
+            transaction_number=transaction_number,
+            universe_size=universe_size)
     print('Random transactions generated\n')
     #print(transactions)
     #print()
 
     start = time()
     for i in range(perf_round):
+        (n, report) = test_relim(False, transactions, 10)
+        print('Done round {0}'.format(i))
+    end = time()
+    print('Relim took: {0}'.format(end - start))
+    print('Computed {0} frequent item sets.'.format(n))
+    #print(report)
+
+    start = time()
+    for i in range(perf_round):
         (n, report) = test_sam(False, transactions, 10)
         print('Done round {0}'.format(i))
     end = time()
-    print('Sam took: {0}'.format(end-start))
+    print('Sam took: {0}'.format(end - start))
     print('Computed {0} frequent item sets.'.format(n))
-    #print(report)
