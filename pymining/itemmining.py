@@ -170,11 +170,11 @@ def sam(sam_input, fis, report, min_support):
             d.append(b.popleft())
         a = d
         if s >= min_support:
-            fis.add(i)
+            fis.add(i[1])
             report.add((frozenset(fis), s))
             #print('{0} with support {1}'.format(fis, s))
             n = n + 1 + sam(c, fis, report, min_support)
-            fis.remove(i)
+            fis.remove(i[1])
     return n
 
 
@@ -274,7 +274,7 @@ def relim(rinput, fis, report, min_support):
         item = a[-1][0][1]
         s = a[-1][0][0]
         if s >= min_support:
-            fis.add(item)
+            fis.add(item[1])
             #print('Report {0} with support {1}'.format(fis, s))
             report.add((frozenset(fis), s))
             b = _new_relim_input(len(a) - 1, key_map)
@@ -290,7 +290,7 @@ def relim(rinput, fis, report, min_support):
                     lists.append((count, new_rest))
                 b[index] = ((k_count + count, k), lists)
             n = n + 1 + relim((b, key_map), fis, report, min_support)
-            fis.remove(item)
+            fis.remove(item[1])
 
         rest_lists = a[-1][1]
         for (count, rest) in rest_lists:
@@ -465,16 +465,18 @@ def _create_cond_tree(head_node):
 
 
 def _prune_cond_tree(new_heads, min_support):
-    for key in new_heads:
-        (node, head_support) = new_heads[key]
+    for (node, head_support) in new_heads.values():
         if head_support < min_support:
             while node is not None:
                 node.prune_me()
                 node = node.next_node
-            del(new_heads[key])
+            # First, you cannot delete while iterating in a dict.
+            # Second, deleting afterwards takes longer than skipping it
+            # in fpgrowth's loopme
+            #del(new_heads[key])
 
 
-def fpgrowth(fptree, report, fis, min_support=2):
+def fpgrowth(fptree, fis, report, min_support=2):
     (_, heads) = fptree
     n = 0
     for (head_node, head_support) in heads.values():
@@ -482,11 +484,11 @@ def fpgrowth(fptree, report, fis, min_support=2):
             continue
 
         fis.add(head_node.key)
-        print('Report {0} with support {1}'.format(fis, head_support))
+        #print('Report {0} with support {1}'.format(fis, head_support))
         report.add((frozenset(fis), head_support))
         new_heads = _create_cond_tree(head_node)
         _prune_cond_tree(new_heads, min_support)
-        n = n + 1 + fpgrowth((None, new_heads), report, fis, min_support)
+        n = n + 1 + fpgrowth((None, new_heads), fis, report, min_support)
         fis.remove(head_node.key)
     return n
 
