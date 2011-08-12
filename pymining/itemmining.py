@@ -107,7 +107,7 @@ def get_frequencies(transactions):
     return frequencies
 
 
-def get_sam_input(transactions, key_func):
+def get_sam_input(transactions, key_func=None):
     '''Given a list of transactions and a key function, returns a data
        structure used as the input of the sam algorithm.
 
@@ -115,6 +115,10 @@ def get_sam_input(transactions, key_func):
        :param key_func: a function that returns a comparable key for a
         transaction item.
     '''
+
+    if key_func is None:
+        key_func = lambda e: e
+
     (asorted_seqs, _) = _sort_transactions_by_freq(transactions, key_func)
 
     # Group same transactions together
@@ -133,16 +137,22 @@ def get_sam_input(transactions, key_func):
     return sam_input
 
 
-def sam(sam_input, fis, report, min_support):
+def sam(sam_input, min_support=2):
     '''Finds frequent item sets of items appearing in a list of transactions
        based on the Split and Merge algorithm by Christian Borgelt.
 
-       :sam_input: The input of the algorithm. Must come from `get_sam_input`.
-       :fis: An empty set used to temporarily stored the frequent item sets.
-       :report: A set that will contain the mined frequent item sets. Each set
-        in `report` contains tuples of (total freq. of item, key of item).
-       :min_support: The minimal support of a set to be included in `report`.
+       :param sam_input: The input of the algorithm. Must come from
+        `get_sam_input`.
+       :param min_support: The minimal support of a set to be included.
+       :rtype: A set containing the frequent item sets and their support.
     '''
+    fis = set()
+    report = set()
+    _sam(sam_input, fis, report, min_support)
+    return report
+
+
+def _sam(sam_input, fis, report, min_support):
     n = 0
     a = deque(sam_input)
     while len(a) > 0 and len(a[0][1]) > 0:
@@ -176,7 +186,7 @@ def sam(sam_input, fis, report, min_support):
             fis.add(i[1])
             report.add((tuple(fis), s))
             #print('{0} with support {1}'.format(fis, s))
-            n = n + 1 + sam(c, fis, report, min_support)
+            n = n + 1 + _sam(c, fis, report, min_support)
             fis.remove(i[1])
     return n
 
@@ -187,7 +197,7 @@ def test_sam(should_print=False, ts=None, support=2):
     sam_input = get_sam_input(ts, lambda e: e)
     fis = set()
     report = set()
-    n = sam(sam_input, fis, report, support)
+    n = _sam(sam_input, fis, report, support)
     if should_print:
         print(n)
         print(report)
@@ -214,7 +224,7 @@ def _get_key_map(frequencies):
     return key_map
 
 
-def get_relim_input(transactions, key_func):
+def get_relim_input(transactions, key_func=None):
     '''Given a list of transactions and a key function, returns a data
        structure used as the input of the relim algorithm.
 
@@ -233,6 +243,9 @@ def get_relim_input(transactions, key_func):
     # relim_input[x][1] = lists of transaction rests
     # relim_input[x][1][x][0] = number of times a rest of transaction appears
     # relim_input[x][1][x][1] = rest of transaction prefixed by key_freq
+
+    if key_func is None:
+        key_func = lambda e: e
 
     (asorted_seqs, frequencies) = _sort_transactions_by_freq(transactions,
             key_func)
@@ -257,7 +270,7 @@ def get_relim_input(transactions, key_func):
     return (relim_input, key_map)
 
 
-def relim(rinput, fis, report, min_support):
+def relim(rinput, min_support=2):
     '''Finds frequent item sets of items appearing in a list of transactions
        based on Recursive Elimination algorithm by Christian Borgelt.
 
@@ -265,13 +278,18 @@ def relim(rinput, fis, report, min_support):
        margin. This is unexpected as FP-Growth is supposed to be superior, but
        this may be due to my implementation of these algorithms.
 
-       :rinput: The input of the algorithm. Must come from
+       :param rinput: The input of the algorithm. Must come from
         `get_relim_input`.
-       :fis: An empty set used to temporarily stored the frequent item sets.
-       :report: A set that will contain the mined frequent item sets. Each set
-        in `report` contains tuples of (total freq. of item, key of item).
-       :min_support: The minimal support of a set to be included in `report`.
+       :param min_support: The minimal support of a set to be included.
+       :rtype: A set containing the frequent item sets and their support.
     '''
+    fis = set()
+    report = set()
+    _relim(rinput, fis, report, min_support)
+    return report
+
+
+def _relim(rinput, fis, report, min_support):
     (relim_input, key_map) = rinput
     n = 0
     # Maybe this one isn't necessary
@@ -298,7 +316,7 @@ def relim(rinput, fis, report, min_support):
                 if len(new_rest) > 0:
                     lists.append((count, new_rest))
                 b[index] = ((k_count + count, k), lists)
-            n = n + 1 + relim((b, key_map), fis, report, min_support)
+            n = n + 1 + _relim((b, key_map), fis, report, min_support)
             fis.remove(item[1])
 
         rest_lists = a[-1][1]
@@ -322,7 +340,7 @@ def test_relim(should_print=False, ts=None, support=2):
     relim_input = get_relim_input(ts, lambda e: e)
     fis = set()
     report = set()
-    n = relim(relim_input, fis, report, support)
+    n = _relim(relim_input, fis, report, support)
     if should_print:
         print(n)
         print(report)
@@ -433,7 +451,19 @@ class FPNode(object):
         return self.__str__()
 
 
-def get_fptree(transactions, key_func, min_support=2):
+def get_fptree(transactions, key_func=None, min_support=2):
+    '''Given a list of transactions and a key function, returns a data
+       structure used as the input of the relim algorithm.
+
+       :param transactions: a sequence of sequences. [ [transaction items...]]
+       :param key_func: a function that returns a comparable key for a
+        transaction item.
+       :param min_support: minimum support.
+    '''
+
+    if key_func is None:
+        key_func = lambda e: e
+
     asorted_seqs, frequencies = _sort_transactions_by_freq(transactions,
             key_func, True, False, False)
     transactions = [[item[1] for item in aseq if item[0] >= min_support] for
@@ -487,18 +517,23 @@ def _prune_cond_tree(new_heads, min_support):
             #del(new_heads[key])
 
 
-def fpgrowth(fptree, fis, report, min_support=2, pruning=True):
+def fpgrowth(fptree, min_support=2, pruning=True):
     '''Finds frequent item sets of items appearing in a list of transactions
        based on FP-Growth by Han et al.
 
-       :fptree: The input of the algorithm. Must come from
+       :param fptree: The input of the algorithm. Must come from
         `get_fptree`.
-       :fis: An empty set used to temporarily stored the frequent item sets.
-       :report: A set that will contain the mined frequent item sets. Each set
-        in `report` contains tuples of (total freq. of item, key of item).
-       :min_support: The minimal support of a set to be included in `report`.
-       :pruning: Perform a pruning operation. Default to True.
+       :param min_support: The minimal support of a set.
+       :param pruning: Perform a pruning operation. Default to True.
+       :rtype: A set containing the frequent item sets and their support.
     '''
+    fis = set()
+    report = set()
+    _fpgrowth(fptree, fis, report, min_support, pruning)
+    return report
+
+
+def _fpgrowth(fptree, fis, report, min_support=2, pruning=True):
     (_, heads) = fptree
     n = 0
     for (head_node, head_support) in heads.values():
@@ -511,7 +546,7 @@ def fpgrowth(fptree, fis, report, min_support=2, pruning=True):
         new_heads = _create_cond_tree(head_node, pruning)
         if pruning:
             _prune_cond_tree(new_heads, min_support)
-        n = n + 1 + fpgrowth((None, new_heads), fis, report, min_support,
+        n = n + 1 + _fpgrowth((None, new_heads), fis, report, min_support,
                 pruning)
         fis.remove(head_node.key)
     return n
@@ -523,7 +558,7 @@ def test_fpgrowth(should_print=False, ts=None, support=2, pruning=True):
     fptree = get_fptree(ts, lambda e: e, support)
     fis = set()
     report = set()
-    n = fpgrowth(fptree, fis, report, support, pruning)
+    n = _fpgrowth(fptree, fis, report, support, pruning)
     if should_print:
         print(n)
         print(report)
@@ -566,7 +601,8 @@ def test_perf(perf_round=10, sparse=True):
 
     start = time()
     for i in range(perf_round):
-        (n, report) = test_fpgrowth(False, transactions, support, pruning=False)
+        (n, report) = test_fpgrowth(False, transactions, support,
+                pruning=False)
         print('Done round {0}'.format(i))
     end = time()
     print('FP-Growth (pruning off) took: {0}'.format(end - start))
