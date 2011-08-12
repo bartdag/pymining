@@ -59,6 +59,9 @@ the recommended algorithm as it outperforms the two others (SaM and FP-growth)
 in all of my benchmarks. This is probably due to my lazy implementation of
 FP-growth.
 
+The pruning option in FP-growth does not work and should be turned to False for
+now.
+
 
 Todo
 ----
