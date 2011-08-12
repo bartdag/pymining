@@ -77,7 +77,7 @@ environment.
 
 The performance may increase in a virtual machine (e.g., pypy), but similar
 implementations in C or Java will always outperform pymining. This library is
-still suitable for reasonable data sets or environments were performance is not
+still suitable for reasonable data sets or environments where performance is not
 critical.
 
 The memory consumption is quite high.
