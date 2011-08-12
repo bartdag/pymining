@@ -355,22 +355,33 @@ class FPNode(object):
 
         return child
 
-    def get_cond_tree(self, child, count, visited, heads, last_insert):
+    def get_cond_tree(self, child, count, visited, heads, last_insert,
+            dont_create=False):
 
         key = self.key
-        try:
-            cond_node = visited[self]
-        except Exception:
-            cond_node = self._create_cond_child(visited, heads, last_insert)
+
+        if dont_create:
+            # This is a head, we don't want to copy it.
+            cond_node = None
+        else:
+            try:
+                cond_node = visited[self]
+            except Exception:
+                cond_node = self._create_cond_child(visited, heads,
+                        last_insert)
 
         if child is not None:
+            # We came from a cond node. Maintain children
             cond_node.children[child.key] = child
 
         if self.parent is not None:
-            cond_node.count += count
-            heads[key][1] += count
-            cond_node.parent = self.parent.get_cond_tree(cond_node, count, visited, 
+            # Recursion
+            parent_node = self.parent.get_cond_tree(cond_node, count, visited,
                     heads, last_insert)
+            if cond_node is not None:
+                cond_node.count += count
+                heads[key][1] += count
+                cond_node.parent = parent_node
 
         return cond_node
 
@@ -394,8 +405,13 @@ class FPNode(object):
         del(parent.children[self.key])
         for child_key in self.children:
             child = self.children[child_key]
-            child.parent = parent
-            parent.children[child_key] = child
+            if child_key in parent.children:
+                # Combine same children
+                parent.children[child_key].count += child.count
+            else:
+                # Add new child
+                child.parent = parent
+                parent.children[child_key] = child
 
     def __str__(self):
         child_str = ','.join([str(key) for key in self.children])
@@ -405,8 +421,6 @@ class FPNode(object):
     def __repr__(self):
         return self.__str__()
     
-
-# Optimization 1: add count of heads in heads.
 
 def get_fptree(transactions, key_func, min_support=2):
     asorted_seqs, frequencies = _sort_transactions_by_freq(transactions, key_func, True,
@@ -420,9 +434,10 @@ def get_fptree(transactions, key_func, min_support=2):
     for transaction in transactions:
         root.add_path(transaction, 0, len(transaction), heads, last_insert)
                 
-    new_heads = sorted(heads.values(), key=lambda v: (v[1], v[0].key))
+    #new_heads = sorted(heads.values(), key=lambda v: (v[1], v[0].key))
+    #new_heads = tuple(heads.values())
 
-    return (root, new_heads)
+    return (root, heads)
 
 
 def _print_prefix_tree(node):
@@ -438,12 +453,42 @@ def _print_head(head):
         node = node.parent
 
 
-def fpgrowth(fptree):
-    (root, heads) = fptree
-    # cond tree: done
-    # prune: done
-    # issue #1: which head to process first
-    # issue #2: do we cut and do we remove the children afterwards?
+def _create_cond_tree(head_node):
+    visited = {}
+    new_heads = {}
+    last_insert = {}
+    while head_node is not None:
+        head_node.get_cond_tree(None, head_node.count, visited, new_heads,
+                last_insert, True)
+        head_node = head_node.next_node
+    return new_heads
+
+
+def _prune_cond_tree(new_heads, min_support):
+    for key in new_heads:
+        (node, head_support) = new_heads[key]
+        if head_support < min_support:
+            while node is not None:
+                node.prune_me()
+                node = node.next_node
+            del(new_heads[key])
+
+
+def fpgrowth(fptree, report, fis, min_support=2):
+    (_, heads) = fptree
+    n = 0
+    for (head_node, head_support) in heads.values():
+        if head_support < min_support:
+            continue
+
+        fis.add(head_node.key)
+        print('Report {0} with support {1}'.format(fis, head_support))
+        report.add((frozenset(fis), head_support))
+        new_heads = _create_cond_tree(head_node)
+        _prune_cond_tree(new_heads, min_support)
+        n = n + 1 + fpgrowth((None, new_heads), report, fis, min_support)
+        fis.remove(head_node.key)
+    return n
 
 
 def test_perf(perf_round=10, sparse=True):
