@@ -63,9 +63,9 @@ FP-growth.
 Todo
 ----
 
-# Write unit tests instead of manual testing (doh)
-# Move benchmark functions in a separate module
-# Implement at least one association rule mining algorithm
+#. Write unit tests instead of manual testing (doh)
+#. Move benchmark functions in a separate module
+#. Implement at least one association rule mining algorithm
 
 
 About performance and memory usage
