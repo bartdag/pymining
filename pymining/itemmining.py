@@ -5,7 +5,6 @@ import random
 import sys
 
 
-
 if sys.version_info[0] < 3:
     range = xrange
 
@@ -25,12 +24,13 @@ def get_default_transactions():
             ('a', 'b', 'd')
             )
 
+
 def get_default_transactions_alt():
     '''Returns a small list of transactions. For testing purpose.'''
     return (
             ('a', 'b'),
             ('b', 'c', 'd'),
-            ('a','c', 'd', 'e'),
+            ('a', 'c', 'd', 'e'),
             ('a', 'd', 'e'),
             ('a', 'b', 'c'),
             ('a', 'b', 'c', 'd'),
@@ -43,23 +43,26 @@ def get_default_transactions_alt():
 
 def get_random_transactions(transaction_number=500,
         max_item_per_transaction=100, max_key_length=50,
-        key_alphabet=None, universe_size=1000):
+        key_alphabet=string.ascii_letters, universe_size=1000):
     '''Generates a random list of `transaction_number` transactions containing
        from 0 to `max_item_per_transaction` from a collection of
        `universe_size`. Each key has a maximum length of `max_key_length` and
        is computed from a sequence of characters specified by `key_alphabet`
        (default is ascii letters).
+
+       If `key_alphabet` is None, range(universize_size) is used as the
+       alphabet and `max_key_length` is ignored.
     '''
 
     if key_alphabet is None:
-        key_alphabet = string.ascii_letters
+        words = list(range(universe_size))
+    else:
+        words = []
+        for _ in range(universe_size):
 
-    words = []
-    for _ in range(universe_size):
-
-        word = ''.join((random.choice(key_alphabet) for x in
-            range(random.randint(1, max_key_length))))
-        words.append(word)
+            word = ''.join((random.choice(key_alphabet) for x in
+                range(random.randint(1, max_key_length))))
+            words.append(word)
 
     transactions = []
     for _ in range(transaction_number):
@@ -77,7 +80,7 @@ def _sort_transactions_by_freq(transactions, key_func, reverse_int=False,
 
     asorted_seqs = []
     for key_seq in key_seqs:
-        if len(key_seq) == 0:
+        if not key_seq:
             continue
         # Sort each transaction (infrequent key first)
         l = [(frequencies[i], i) for i in key_seq]
@@ -171,7 +174,7 @@ def sam(sam_input, fis, report, min_support):
         a = d
         if s >= min_support:
             fis.add(i[1])
-            report.add((frozenset(fis), s))
+            report.add((tuple(fis), s))
             #print('{0} with support {1}'.format(fis, s))
             n = n + 1 + sam(c, fis, report, min_support)
             fis.remove(i[1])
@@ -237,7 +240,7 @@ def get_relim_input(transactions, key_func):
 
     relim_input = _new_relim_input(len(key_map), key_map)
     for seq in asorted_seqs:
-        if len(seq) < 2:
+        if not seq:
             continue
         index = key_map[seq[0]]
         ((count, char), lists) = relim_input[index]
@@ -258,6 +261,10 @@ def relim(rinput, fis, report, min_support):
     '''Finds frequent item sets of items appearing in a list of transactions
        based on Recursive Elimination algorithm by Christian Borgelt.
 
+       In my synthetic tests, Relim outperforms other algorithms by a large
+       margin. This is unexpected as FP-Growth is supposed to be superior, but
+       this may be due to my implementation of these algorithms.
+
        :rinput: The input of the algorithm. Must come from
         `get_relim_input`.
        :fis: An empty set used to temporarily stored the frequent item sets.
@@ -276,11 +283,13 @@ def relim(rinput, fis, report, min_support):
         if s >= min_support:
             fis.add(item[1])
             #print('Report {0} with support {1}'.format(fis, s))
-            report.add((frozenset(fis), s))
+            report.add((tuple(fis), s))
             b = _new_relim_input(len(a) - 1, key_map)
             rest_lists = a[-1][1]
 
             for (count, rest) in rest_lists:
+                if not rest:
+                    continue
                 k = rest[0]
                 index = key_map[k]
                 new_rest = rest[1:]
@@ -294,6 +303,8 @@ def relim(rinput, fis, report, min_support):
 
         rest_lists = a[-1][1]
         for (count, rest) in rest_lists:
+            if not rest:
+                continue
             k = rest[0]
             index = key_map[k]
             new_rest = rest[1:]
@@ -356,7 +367,7 @@ class FPNode(object):
         return child
 
     def get_cond_tree(self, child, count, visited, heads, last_insert,
-            dont_create=False):
+            dont_create=False, maintain_children=True):
 
         key = self.key
 
@@ -370,14 +381,14 @@ class FPNode(object):
                 cond_node = self._create_cond_child(visited, heads,
                         last_insert)
 
-        if child is not None:
+        if child is not None and maintain_children:
             # We came from a cond node. Maintain children
             cond_node.children[child.key] = child
 
         if self.parent is not None:
             # Recursion
             parent_node = self.parent.get_cond_tree(cond_node, count, visited,
-                    heads, last_insert)
+                    heads, last_insert, False, maintain_children)
             if cond_node is not None:
                 cond_node.count += count
                 heads[key][1] += count
@@ -387,7 +398,7 @@ class FPNode(object):
 
     def _create_cond_child(self, visited, heads, last_insert):
         key = self.key
-        cond_node = FPNode(key, None) 
+        cond_node = FPNode(key, None)
         visited[self] = cond_node
         try:
             last_cond_node = last_insert[key]
@@ -420,11 +431,11 @@ class FPNode(object):
 
     def __repr__(self):
         return self.__str__()
-    
+
 
 def get_fptree(transactions, key_func, min_support=2):
-    asorted_seqs, frequencies = _sort_transactions_by_freq(transactions, key_func, True,
-            False, False)
+    asorted_seqs, frequencies = _sort_transactions_by_freq(transactions,
+            key_func, True, False, False)
     transactions = [[item[1] for item in aseq if item[0] >= min_support] for
             aseq in asorted_seqs]
 
@@ -433,7 +444,7 @@ def get_fptree(transactions, key_func, min_support=2):
     last_insert = {}
     for transaction in transactions:
         root.add_path(transaction, 0, len(transaction), heads, last_insert)
-                
+
     #new_heads = sorted(heads.values(), key=lambda v: (v[1], v[0].key))
     #new_heads = tuple(heads.values())
 
@@ -453,13 +464,13 @@ def _print_head(head):
         node = node.parent
 
 
-def _create_cond_tree(head_node):
+def _create_cond_tree(head_node, pruning):
     visited = {}
     new_heads = {}
     last_insert = {}
     while head_node is not None:
         head_node.get_cond_tree(None, head_node.count, visited, new_heads,
-                last_insert, True)
+                last_insert, True, pruning)
         head_node = head_node.next_node
     return new_heads
 
@@ -476,7 +487,18 @@ def _prune_cond_tree(new_heads, min_support):
             #del(new_heads[key])
 
 
-def fpgrowth(fptree, fis, report, min_support=2):
+def fpgrowth(fptree, fis, report, min_support=2, pruning=True):
+    '''Finds frequent item sets of items appearing in a list of transactions
+       based on FP-Growth by Han et al.
+
+       :fptree: The input of the algorithm. Must come from
+        `get_fptree`.
+       :fis: An empty set used to temporarily stored the frequent item sets.
+       :report: A set that will contain the mined frequent item sets. Each set
+        in `report` contains tuples of (total freq. of item, key of item).
+       :min_support: The minimal support of a set to be included in `report`.
+       :pruning: Perform a pruning operation. Default to True.
+    '''
     (_, heads) = fptree
     n = 0
     for (head_node, head_support) in heads.values():
@@ -485,41 +507,82 @@ def fpgrowth(fptree, fis, report, min_support=2):
 
         fis.add(head_node.key)
         #print('Report {0} with support {1}'.format(fis, head_support))
-        report.add((frozenset(fis), head_support))
-        new_heads = _create_cond_tree(head_node)
-        _prune_cond_tree(new_heads, min_support)
-        n = n + 1 + fpgrowth((None, new_heads), fis, report, min_support)
+        report.add((tuple(fis), head_support))
+        new_heads = _create_cond_tree(head_node, pruning)
+        if pruning:
+            _prune_cond_tree(new_heads, min_support)
+        n = n + 1 + fpgrowth((None, new_heads), fis, report, min_support,
+                pruning)
         fis.remove(head_node.key)
     return n
 
 
+def test_fpgrowth(should_print=False, ts=None, support=2, pruning=True):
+    if ts is None:
+        ts = get_default_transactions()
+    fptree = get_fptree(ts, lambda e: e, support)
+    fis = set()
+    report = set()
+    n = fpgrowth(fptree, fis, report, support, pruning)
+    if should_print:
+        print(n)
+        print(report)
+    return (n, report)
+
+
 def test_perf(perf_round=10, sparse=True):
+    '''Non-scientifically tests the performance of three algorithms by running
+       `perf_round` rounds of FP-Growth, FP-Growth without pruning, Relim, and
+       SAM.
+
+       A random set of transactions is created (the same is obviously used
+       for all algorithms).
+
+       If `sparse` is False, the random transactions are more dense, i.e., some
+       elements appear in almost all transactions.
+    '''
 
     if sparse:
         universe_size = 2000
         transaction_number = 500
+        support = 10
     else:
-        universe_size = 200
-        transaction_number = 100
+        universe_size = 110
+        transaction_number = 75
+        support = 25
     transactions = get_random_transactions(
             transaction_number=transaction_number,
-            universe_size=universe_size)
+            universe_size=universe_size,
+            key_alphabet=None)
     print('Random transactions generated\n')
-    #print(transactions)
-    #print()
 
     start = time()
     for i in range(perf_round):
-        (n, report) = test_relim(False, transactions, 10)
+        (n, report) = test_fpgrowth(False, transactions, support)
+        print('Done round {0}'.format(i))
+    end = time()
+    print('FP-Growth took: {0}'.format(end - start))
+    print('Computed {0} frequent item sets.'.format(n))
+
+    start = time()
+    for i in range(perf_round):
+        (n, report) = test_fpgrowth(False, transactions, support, pruning=False)
+        print('Done round {0}'.format(i))
+    end = time()
+    print('FP-Growth (pruning off) took: {0}'.format(end - start))
+    print('Computed {0} frequent item sets.'.format(n))
+
+    start = time()
+    for i in range(perf_round):
+        (n, report) = test_relim(False, transactions, support)
         print('Done round {0}'.format(i))
     end = time()
     print('Relim took: {0}'.format(end - start))
     print('Computed {0} frequent item sets.'.format(n))
-    #print(report)
 
     start = time()
     for i in range(perf_round):
-        (n, report) = test_sam(False, transactions, 10)
+        (n, report) = test_sam(False, transactions, support)
         print('Done round {0}'.format(i))
     end = time()
     print('Sam took: {0}'.format(end - start))
