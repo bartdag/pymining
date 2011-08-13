@@ -59,7 +59,7 @@ the recommended algorithm as it outperforms the two others (SaM and FP-growth)
 in all of my benchmarks. This is probably due to my lazy implementation of
 FP-growth.
 
-The pruning option in FP-growth does not work and should be turned to False for
+The pruning option in FP-growth is buggy and is turned to False by default for
 now.
 
 
@@ -78,10 +78,9 @@ All algorithms are implemented in Python and not in a C extension. The library
 does not require any dependency and can thus be installed in almost any Python
 environment. 
 
-The performance may increase in a virtual machine (e.g., pypy), but similar
-implementations in C or Java will always outperform pymining. This library is
-still suitable for reasonable data sets or environments where performance is not
-critical.
+The performance does increase with pypy and its jit. In one of my benchark,
+FP-growth went from 100 seconds with cpython to 23 seconds with pypy and relim
+went from 23 seconds to 4 seconds.
 
 The memory consumption is quite high.
 

@@ -349,6 +349,8 @@ def test_relim(should_print=False, ts=None, support=2):
 
 class FPNode(object):
 
+    root_key = object()
+
     def __init__(self, key, parent):
         self.children = {}
         self.parent = parent
@@ -429,18 +431,43 @@ class FPNode(object):
 
         return cond_node
 
-    def prune_me(self):
-        parent = self.parent
-        del(parent.children[self.key])
-        for child_key in self.children:
-            child = self.children[child_key]
-            if child_key in parent.children:
-                # Combine same children
-                parent.children[child_key].count += child.count
-            else:
-                # Add new child
-                child.parent = parent
-                parent.children[child_key] = child
+    def _find_ancestor(self, heads, min_support):
+        ancestor = self.parent
+        while ancestor.key != FPNode.root_key:
+            try:
+                support = heads[ancestor.key][1]
+                if support >= min_support:
+                    break
+                else:
+                    ancestor = ancestor.parent
+            except KeyError:
+                ancestor = ancestor.parent
+        return ancestor
+
+    def prune_me(self, from_head_list, visited_parents, merged_before,
+            merged_now, heads, min_support):
+        try:
+            # Parent was merged
+            new_parent = merged_before[self.parent]
+            self.parent = new_parent
+        except KeyError:
+            # Ok, no need to change parent
+            pass
+
+        ancestor = self._find_ancestor(heads, min_support)
+        self.parent = ancestor
+
+        try:
+            # Oh, we visited another child of this parent!
+            other_node = visited_parents[ancestor]
+            merged_now[self] = other_node
+            other_node.count += self.count
+            # Remove yourself from the list
+            if from_head_list is not None:
+                from_head_list.next_node = self.next_node
+        except KeyError:
+            # We are a new child!
+            visited_parents[ancestor] = self
 
     def __str__(self):
         child_str = ','.join([str(key) for key in self.children])
@@ -469,16 +496,27 @@ def get_fptree(transactions, key_func=None, min_support=2):
     transactions = [[item[1] for item in aseq if item[0] >= min_support] for
             aseq in asorted_seqs]
 
-    root = FPNode(None, None)
+    root = FPNode(FPNode.root_key, None)
     heads = {}
     last_insert = {}
     for transaction in transactions:
         root.add_path(transaction, 0, len(transaction), heads, last_insert)
 
-    #new_heads = sorted(heads.values(), key=lambda v: (v[1], v[0].key))
+    # Here, v[1] is = to the frequency
+    sorted_heads = sorted(heads.values(), key=lambda v: (v[1], v[0].key))
+    new_heads = OrderedDict()
+    for (head, head_support) in sorted_heads:
+        new_heads[head.key] = (head, head_support)
     #new_heads = tuple(heads.values())
 
-    return (root, heads)
+    return (root, new_heads)
+
+
+def _init_heads(orig_heads):
+    new_heads = OrderedDict()
+    for key in orig_heads:
+        new_heads[key] = (None, 0)
+    return new_heads
 
 
 def _print_prefix_tree(node):
@@ -494,9 +532,8 @@ def _print_head(head):
         node = node.parent
 
 
-def _create_cond_tree(head_node, pruning):
+def _create_cond_tree(head_node, new_heads, pruning):
     visited = {}
-    new_heads = {}
     last_insert = {}
     while head_node is not None:
         head_node.get_cond_tree(None, head_node.count, visited, new_heads,
@@ -505,26 +542,31 @@ def _create_cond_tree(head_node, pruning):
     return new_heads
 
 
-def _prune_cond_tree(new_heads, min_support):
-    for (node, head_support) in new_heads.values():
-        if head_support < min_support:
+def _prune_cond_tree(heads, min_support):
+    merged_before = {}
+    merged_now = {}
+    for key in reversed(heads):
+        (node, head_support) = heads[key]
+        if head_support > 0:
+            visited_parents = {}
+            previous_node = None
             while node is not None:
-                node.prune_me()
+                node.prune_me(previous_node, visited_parents, merged_before,
+                        merged_now, heads, min_support)
+                previous_node = node
                 node = node.next_node
-            # First, you cannot delete while iterating in a dict.
-            # Second, deleting afterwards takes longer than skipping it
-            # in fpgrowth's loopme
-            #del(new_heads[key])
+        merged_before = merged_now
+        merged_now = {}
 
 
-def fpgrowth(fptree, min_support=2, pruning=True):
+def fpgrowth(fptree, min_support=2, pruning=False):
     '''Finds frequent item sets of items appearing in a list of transactions
        based on FP-Growth by Han et al.
 
        :param fptree: The input of the algorithm. Must come from
         `get_fptree`.
        :param min_support: The minimal support of a set.
-       :param pruning: Perform a pruning operation. Default to True.
+       :param pruning: Perform a pruning operation. Default to False.
        :rtype: A set containing the frequent item sets and their support.
     '''
     fis = set()
@@ -543,7 +585,8 @@ def _fpgrowth(fptree, fis, report, min_support=2, pruning=True):
         fis.add(head_node.key)
         #print('Report {0} with support {1}'.format(fis, head_support))
         report.add((tuple(fis), head_support))
-        new_heads = _create_cond_tree(head_node, pruning)
+        new_heads = _init_heads(heads)
+        _create_cond_tree(head_node, new_heads, pruning)
         if pruning:
             _prune_cond_tree(new_heads, min_support)
         n = n + 1 + _fpgrowth((None, new_heads), fis, report, min_support,
@@ -552,7 +595,7 @@ def _fpgrowth(fptree, fis, report, min_support=2, pruning=True):
     return n
 
 
-def test_fpgrowth(should_print=False, ts=None, support=2, pruning=True):
+def test_fpgrowth(should_print=False, ts=None, support=2, pruning=False):
     if ts is None:
         ts = get_default_transactions()
     fptree = get_fptree(ts, lambda e: e, support)
@@ -565,7 +608,7 @@ def test_fpgrowth(should_print=False, ts=None, support=2, pruning=True):
     return (n, report)
 
 
-def test_perf(perf_round=10, sparse=True):
+def test_perf(perf_round=10, sparse=True, seed=None):
     '''Non-scientifically tests the performance of three algorithms by running
        `perf_round` rounds of FP-Growth, FP-Growth without pruning, Relim, and
        SAM.
@@ -575,7 +618,11 @@ def test_perf(perf_round=10, sparse=True):
 
        If `sparse` is False, the random transactions are more dense, i.e., some
        elements appear in almost all transactions.
+
+       The `seed` parameter can be used to obtain the same sample across
+       multiple calls.
     '''
+    random.seed(seed)
 
     if sparse:
         universe_size = 2000
@@ -590,14 +637,6 @@ def test_perf(perf_round=10, sparse=True):
             universe_size=universe_size,
             key_alphabet=None)
     print('Random transactions generated\n')
-
-    start = time()
-    for i in range(perf_round):
-        (n, report) = test_fpgrowth(False, transactions, support)
-        print('Done round {0}'.format(i))
-    end = time()
-    print('FP-Growth took: {0}'.format(end - start))
-    print('Computed {0} frequent item sets.'.format(n))
 
     start = time()
     for i in range(perf_round):
