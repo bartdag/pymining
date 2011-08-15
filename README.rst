@@ -43,7 +43,8 @@ Usage
     set([(('c',), 4), (('b',), 4), (('a', 'c'), 2), (('a',), 3), (('c', 'b'), 3)])
 
     >>> # Test performance of multiple algorithms
-    >>> itemmining.test_perf()
+    >>> from pymining import perftesting
+    >>> perftesting.test_itemset_perf()
     Random transactions generated
 
     Done round 0
