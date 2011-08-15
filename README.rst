@@ -59,8 +59,8 @@ the recommended algorithm as it outperforms the two others (SaM and FP-growth)
 in all of my benchmarks. This is probably due to my lazy implementation of
 FP-growth.
 
-The pruning option in FP-growth is buggy and is turned to False by default for
-now.
+The pruning option in FP-growth makes the algorithm slow and is turned to False by default for
+now. This is surprising because pruning the tree should make it faster.
 
 
 Todo

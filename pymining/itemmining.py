@@ -387,7 +387,7 @@ class FPNode(object):
         return child
 
     def get_cond_tree(self, child, count, visited, heads, last_insert,
-            dont_create=False, maintain_children=True):
+            dont_create=False):
 
         key = self.key
 
@@ -401,14 +401,10 @@ class FPNode(object):
                 cond_node = self._create_cond_child(visited, heads,
                         last_insert)
 
-        if child is not None and maintain_children:
-            # We came from a cond node. Maintain children
-            cond_node.children[child.key] = child
-
         if self.parent is not None:
             # Recursion
             parent_node = self.parent.get_cond_tree(cond_node, count, visited,
-                    heads, last_insert, False, maintain_children)
+                    heads, last_insert, False)
             if cond_node is not None:
                 cond_node.count += count
                 heads[key][1] += count
@@ -434,13 +430,10 @@ class FPNode(object):
     def _find_ancestor(self, heads, min_support):
         ancestor = self.parent
         while ancestor.key != FPNode.root_key:
-            try:
-                support = heads[ancestor.key][1]
-                if support >= min_support:
-                    break
-                else:
-                    ancestor = ancestor.parent
-            except KeyError:
+            support = heads[ancestor.key][1]
+            if support >= min_support:
+                break
+            else:
                 ancestor = ancestor.parent
         return ancestor
 
@@ -465,6 +458,7 @@ class FPNode(object):
             # Remove yourself from the list
             if from_head_list is not None:
                 from_head_list.next_node = self.next_node
+            self.next_node = None
         except KeyError:
             # We are a new child!
             visited_parents[ancestor] = self
@@ -537,7 +531,7 @@ def _create_cond_tree(head_node, new_heads, pruning):
     last_insert = {}
     while head_node is not None:
         head_node.get_cond_tree(None, head_node.count, visited, new_heads,
-                last_insert, True, pruning)
+                last_insert, True)
         head_node = head_node.next_node
     return new_heads
 
@@ -551,10 +545,14 @@ def _prune_cond_tree(heads, min_support):
             visited_parents = {}
             previous_node = None
             while node is not None:
+                # If the node is merged, we lose the next_node
+                next_node = node.next_node
                 node.prune_me(previous_node, visited_parents, merged_before,
                         merged_now, heads, min_support)
-                previous_node = node
-                node = node.next_node
+                if node.next_node is not None:
+                    # Only change the previous node if it wasn't merged.
+                    previous_node = node
+                node = next_node
         merged_before = merged_now
         merged_now = {}
 
@@ -637,6 +635,15 @@ def test_perf(perf_round=10, sparse=True, seed=None):
             universe_size=universe_size,
             key_alphabet=None)
     print('Random transactions generated\n')
+
+    start = time()
+    for i in range(perf_round):
+        (n, report) = test_fpgrowth(False, transactions, support,
+                pruning=True)
+        print('Done round {0}'.format(i))
+    end = time()
+    print('FP-Growth (pruning on) took: {0}'.format(end - start))
+    print('Computed {0} frequent item sets.'.format(n))
 
     start = time()
     for i in range(perf_round):
