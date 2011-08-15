@@ -634,7 +634,7 @@ def test_perf(perf_round=10, sparse=True, seed=None):
             transaction_number=transaction_number,
             universe_size=universe_size,
             key_alphabet=None)
-    print('Random transactions generated\n')
+    print('Random transactions generated with seed {0}\n'.format(seed))
 
     start = time()
     for i in range(perf_round):
