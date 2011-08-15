@@ -112,7 +112,7 @@ def _sam(sam_input, fis, report, min_support):
         a = d
         if s >= min_support:
             fis.add(i[1])
-            report[tuple(fis)] = s
+            report[frozenset(fis)] = s
             #print('{0} with support {1}'.format(fis, s))
             n = n + 1 + _sam(c, fis, report, min_support)
             fis.remove(i[1])
@@ -216,7 +216,7 @@ def _relim(rinput, fis, report, min_support):
         if s >= min_support:
             fis.add(item[1])
             #print('Report {0} with support {1}'.format(fis, s))
-            report[tuple(fis)] = s
+            report[frozenset(fis)] = s
             b = _new_relim_input(len(a) - 1, key_map)
             rest_lists = a[-1][1]
 
@@ -471,7 +471,7 @@ def _fpgrowth(fptree, fis, report, min_support=2, pruning=True):
 
         fis.add(head_node.key)
         #print('Report {0} with support {1}'.format(fis, head_support))
-        report[tuple(fis)] = head_support
+        report[frozenset(fis)] = head_support
         new_heads = _init_heads(heads)
         _create_cond_tree(head_node, new_heads, pruning)
         if pruning:
