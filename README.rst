@@ -55,7 +55,7 @@ Usage
     Done round 1
     ...
 
- **Association Rules Mining**
+**Association Rules Mining**
 
  ::
 
