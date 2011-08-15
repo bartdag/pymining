@@ -58,7 +58,7 @@ Usage
 
 **Association Rules Mining**
 
- ::
+::
 
     >>> from pymining import itemmining, assocrules, perftesting
     >>> transactions = perftesting.get_default_transactions()
