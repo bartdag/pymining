@@ -25,7 +25,7 @@ Installation
 
 ::
 
-    pip install -e git://github.com/bartdag/pymining#egg=pymining
+    pip install pymining
 
 
 Usage
