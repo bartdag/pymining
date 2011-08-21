@@ -117,3 +117,27 @@ License
 
 This software is licensed under the `New BSD License`. See the `LICENSE` file
 in the for the full license text.
+
+
+References
+----------
+
+Relim and Sam were designed by Christian Borgelt:
+
+Simple Algorithms for Frequent Item Set Mining, Christian Borgelt, Chapter 16
+of: J. Koronacki, Z.W. Raz, S.T. Wierzchon, and J.K. Kacprzyk (eds.), Advances
+in Machine Learning II (Studies in Computational Intelligence 263), 351-369,
+Springer-Verlag, Berlin, Germany 2010, doi:10.1007/978-3-642-05179-1_16
+
+
+FP-Growth was designed by Han et al.:
+
+Mining Frequent Patterns without Candidate Generation, J. Han, H. Pei, and Y.
+Yin, Proceedings of the Conference on the Management of Data (SIGMOD'00,
+Dallas, TX), 1-12, ACM Press, New York, NY, USA 2000
+
+
+Association Rules Mining is a general algorithm. I used the `course slides
+from Bing Liu
+<http://www.cs.uic.edu/~liub/teach/cs583-fall-05/CS583-association-rules.ppt>`_
+at the University of Illinois.
