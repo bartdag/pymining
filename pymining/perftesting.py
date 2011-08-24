@@ -38,6 +38,11 @@ def get_default_transactions_alt():
             )
 
 
+def get_default_sequences():
+    '''Returns a small list of sequences. For testing purpose.'''
+    return ( 'caabc', 'abcb', 'cabc', 'abbca' )
+
+
 def get_random_transactions(transaction_number=500,
         max_item_per_transaction=100, max_key_length=50,
         key_alphabet=string.ascii_letters, universe_size=1000):
