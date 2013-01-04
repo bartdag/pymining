@@ -14,6 +14,9 @@ that were easily accessible in Python. Moreover, the libraries I am aware of
 often include old algorithms that have been surpassed by newer ones.
 
 
+.. image:: https://api.travis-ci.org/bartdag/pymining.png
+
+
 Requirements
 ------------
 
