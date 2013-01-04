@@ -8,7 +8,7 @@ def mine_assoc_rules(isets, min_support=2, min_confidence=0.5):
 
         for item in key:
             left = frozenset([item])
-            right = key.difference(item)
+            right = key.difference([item])
             _mine_assoc_rules(left, right, support, visited, isets,
                     min_support, min_confidence, rules)
 
@@ -28,7 +28,7 @@ def _mine_assoc_rules(left, right, rule_support, visited, isets, min_support,
         rules.append((left, right, rule_support, confidence))
         # We can try to increase left!
         for item in right:
-            new_left = left.union(item)
-            new_right = right.difference(item)
+            new_left = left.union([item])
+            new_right = right.difference([item])
             _mine_assoc_rules(new_left, new_right, rule_support, visited, isets,
                     min_support, min_confidence, rules)
