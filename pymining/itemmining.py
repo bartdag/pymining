@@ -1,7 +1,8 @@
 from collections import defaultdict, deque, OrderedDict
 
 
-def _sort_transactions_by_freq(transactions, key_func, reverse_int=False,
+def _sort_transactions_by_freq(
+        transactions, key_func, reverse_int=False,
         reverse_ext=False, sort_ext=True):
     key_seqs = [{key_func(i) for i in sequence} for sequence in transactions]
     frequencies = get_frequencies(key_seqs)
@@ -45,7 +46,8 @@ def get_sam_input(transactions, key_func=None):
     '''
 
     if key_func is None:
-        key_func = lambda e: e
+        def key_func(e):
+            return e
 
     (asorted_seqs, _) = _sort_transactions_by_freq(transactions, key_func)
 
@@ -113,7 +115,6 @@ def _sam(sam_input, fis, report, min_support):
         if s >= min_support:
             fis.add(i[1])
             report[frozenset(fis)] = s
-            #print('{0} with support {1}'.format(fis, s))
             n = n + 1 + _sam(c, fis, report, min_support)
             fis.remove(i[1])
     return n
@@ -160,10 +161,11 @@ def get_relim_input(transactions, key_func=None):
     # relim_input[x][1][x][1] = rest of transaction prefixed by key_freq
 
     if key_func is None:
-        key_func = lambda e: e
+        def key_func(e):
+            return e
 
-    (asorted_seqs, frequencies) = _sort_transactions_by_freq(transactions,
-            key_func)
+    (asorted_seqs, frequencies) = _sort_transactions_by_freq(
+        transactions, key_func)
     key_map = _get_key_map(frequencies)
 
     relim_input = _new_relim_input(len(key_map), key_map)
@@ -207,15 +209,12 @@ def relim(rinput, min_support=2):
 def _relim(rinput, fis, report, min_support):
     (relim_input, key_map) = rinput
     n = 0
-    # Maybe this one isn't necessary
-    #a = deque(relim_input)
     a = relim_input
     while len(a) > 0:
         item = a[-1][0][1]
         s = a[-1][0][0]
         if s >= min_support:
             fis.add(item[1])
-            #print('Report {0} with support {1}'.format(fis, s))
             report[frozenset(fis)] = s
             b = _new_relim_input(len(a) - 1, key_map)
             rest_lists = a[-1][1]
@@ -288,7 +287,8 @@ class FPNode(object):
 
         return child
 
-    def get_cond_tree(self, child, count, visited, heads, last_insert,
+    def get_cond_tree(
+            self, child, count, visited, heads, last_insert,
             dont_create=False):
 
         key = self.key
@@ -300,13 +300,13 @@ class FPNode(object):
             try:
                 cond_node = visited[self]
             except Exception:
-                cond_node = self._create_cond_child(visited, heads,
-                        last_insert)
+                cond_node = self._create_cond_child(
+                    visited, heads, last_insert)
 
         if self.parent is not None:
             # Recursion
-            parent_node = self.parent.get_cond_tree(cond_node, count, visited,
-                    heads, last_insert, False)
+            parent_node = self.parent.get_cond_tree(
+                cond_node, count, visited, heads, last_insert, False)
             if cond_node is not None:
                 cond_node.count += count
                 heads[key][1] += count
@@ -339,7 +339,8 @@ class FPNode(object):
                 ancestor = ancestor.parent
         return ancestor
 
-    def prune_me(self, from_head_list, visited_parents, merged_before,
+    def prune_me(
+            self, from_head_list, visited_parents, merged_before,
             merged_now, heads, min_support):
         try:
             # Parent was merged
@@ -367,8 +368,9 @@ class FPNode(object):
 
     def __str__(self):
         child_str = ','.join([str(key) for key in self.children])
-        return '{0} ({1})  [{2}]  {3}'.format(self.key, self.count, child_str,
-                self.next_node is not None)
+        return '{0} ({1})  [{2}]  {3}'.format(
+            self.key, self.count, child_str,
+            self.next_node is not None)
 
     def __repr__(self):
         return self.__str__()
@@ -385,12 +387,14 @@ def get_fptree(transactions, key_func=None, min_support=2):
     '''
 
     if key_func is None:
-        key_func = lambda e: e
+        def key_func(e):
+            return e
 
-    asorted_seqs, frequencies = _sort_transactions_by_freq(transactions,
-            key_func, True, False, False)
-    transactions = [[item[1] for item in aseq if item[0] >= min_support] for
-            aseq in asorted_seqs]
+    asorted_seqs, frequencies = _sort_transactions_by_freq(
+        transactions, key_func, True, False, False)
+    transactions = [
+        [item[1] for item in aseq if item[0] >= min_support] for
+        aseq in asorted_seqs]
 
     root = FPNode(FPNode.root_key, None)
     heads = {}
@@ -403,7 +407,6 @@ def get_fptree(transactions, key_func=None, min_support=2):
     new_heads = OrderedDict()
     for (head, head_support) in sorted_heads:
         new_heads[head.key] = (head, head_support)
-    #new_heads = tuple(heads.values())
 
     return (root, new_heads)
 
@@ -419,8 +422,9 @@ def _create_cond_tree(head_node, new_heads, pruning):
     visited = {}
     last_insert = {}
     while head_node is not None:
-        head_node.get_cond_tree(None, head_node.count, visited, new_heads,
-                last_insert, True)
+        head_node.get_cond_tree(
+            None, head_node.count, visited, new_heads,
+            last_insert, True)
         head_node = head_node.next_node
     return new_heads
 
@@ -436,8 +440,9 @@ def _prune_cond_tree(heads, min_support):
             while node is not None:
                 # If the node is merged, we lose the next_node
                 next_node = node.next_node
-                node.prune_me(previous_node, visited_parents, merged_before,
-                        merged_now, heads, min_support)
+                node.prune_me(
+                    previous_node, visited_parents, merged_before,
+                    merged_now, heads, min_support)
                 if node.next_node is not None:
                     # Only change the previous node if it wasn't merged.
                     previous_node = node
@@ -470,13 +475,12 @@ def _fpgrowth(fptree, fis, report, min_support=2, pruning=True):
             continue
 
         fis.add(head_node.key)
-        #print('Report {0} with support {1}'.format(fis, head_support))
         report[frozenset(fis)] = head_support
         new_heads = _init_heads(heads)
         _create_cond_tree(head_node, new_heads, pruning)
         if pruning:
             _prune_cond_tree(new_heads, min_support)
-        n = n + 1 + _fpgrowth((None, new_heads), fis, report, min_support,
-                pruning)
+        n = n + 1 + _fpgrowth(
+            (None, new_heads), fis, report, min_support, pruning)
         fis.remove(head_node.key)
     return n

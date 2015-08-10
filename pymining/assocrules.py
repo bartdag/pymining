@@ -9,13 +9,15 @@ def mine_assoc_rules(isets, min_support=2, min_confidence=0.5):
         for item in key:
             left = key.difference([item])
             right = frozenset([item])
-            _mine_assoc_rules(left, right, support, visited, isets,
-                    min_support, min_confidence, rules)
+            _mine_assoc_rules(
+                left, right, support, visited, isets,
+                min_support, min_confidence, rules)
 
     return rules
 
 
-def _mine_assoc_rules(left, right, rule_support, visited, isets, min_support,
+def _mine_assoc_rules(
+        left, right, rule_support, visited, isets, min_support,
         min_confidence, rules):
     if (left, right) in visited or len(left) < 1:
         return
@@ -30,5 +32,6 @@ def _mine_assoc_rules(left, right, rule_support, visited, isets, min_support,
         for item in left:
             new_left = left.difference([item])
             new_right = right.union([item])
-            _mine_assoc_rules(new_left, new_right, rule_support, visited, isets,
-                    min_support, min_confidence, rules)
+            _mine_assoc_rules(
+                new_left, new_right, rule_support, visited, isets,
+                min_support, min_confidence, rules)

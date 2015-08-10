@@ -40,10 +40,11 @@ def get_default_transactions_alt():
 
 def get_default_sequences():
     '''Returns a small list of sequences. For testing purpose.'''
-    return ( 'caabc', 'abcb', 'cabc', 'abbca' )
+    return ('caabc', 'abcb', 'cabc', 'abbca')
 
 
-def get_random_transactions(transaction_number=500,
+def get_random_transactions(
+        transaction_number=500,
         max_item_per_transaction=100, max_key_length=50,
         key_alphabet=string.ascii_letters, universe_size=1000):
     '''Generates a random list of `transaction_number` transactions containing
@@ -62,14 +63,17 @@ def get_random_transactions(transaction_number=500,
         words = []
         for _ in range(universe_size):
 
-            word = ''.join((random.choice(key_alphabet) for x in
+            word = ''.join((
+                random.choice(key_alphabet) for x in
                 range(random.randint(1, max_key_length))))
             words.append(word)
 
     transactions = []
     for _ in range(transaction_number):
-        transaction = {word for word in random.sample(words, random.randint(0,
-            max_item_per_transaction))}
+        transaction = {
+            word for word in
+            random.sample(words, random.randint(0, max_item_per_transaction))
+        }
         transactions.append(transaction)
 
     return transactions
@@ -146,8 +150,8 @@ def test_itemset_perf(perf_round=10, sparse=True, seed=None):
 
     start = time()
     for i in range(perf_round):
-        (n, report) = test_fpgrowth(False, transactions, support,
-                pruning=True)
+        (n, report) = test_fpgrowth(
+            False, transactions, support, pruning=True)
         print('Done round {0}'.format(i))
     end = time()
     print('FP-Growth (pruning on) took: {0}'.format(end - start))
@@ -155,8 +159,8 @@ def test_itemset_perf(perf_round=10, sparse=True, seed=None):
 
     start = time()
     for i in range(perf_round):
-        (n, report) = test_fpgrowth(False, transactions, support,
-                pruning=False)
+        (n, report) = test_fpgrowth(
+            False, transactions, support, pruning=False)
         print('Done round {0}'.format(i))
     end = time()
     print('FP-Growth (pruning off) took: {0}'.format(end - start))
