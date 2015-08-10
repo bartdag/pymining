@@ -3,7 +3,7 @@ pymining - A collection of data mining algorithms in Python
 
 :Authors:
   Barthelemy Dagenais
-:Version: 0.1
+:Version: 0.2
 
 pymining is a small collection of data mining algorithms implemented in Python.
 I did not design any of the algorithms, but I use them in my own research so I
@@ -86,9 +86,9 @@ Usage
     >>> seqs = ( 'caabc', 'abcb', 'cabc', 'abbca')
     >>> freq_seqs = seqmining.freq_seq_enum(seqs, 2)
     >>> sorted(freq_seqs)
-    [(('a',), 4), (('a', 'a'), 2), (('a', 'b'), 4), (('a', 'b', 'b'), 2), (('a', 'b', 'c'), 4), 
-     (('a', 'c'), 4), (('b',), 4), (('b', 'b'), 2), (('b', 'c'), 4), (('c',), 4), (('c', 'a'), 3), 
-     (('c', 'a', 'b'), 2), (('c', 'a', 'b', 'c'), 2), (('c', 'a', 'c'), 2), (('c', 'b'), 3), 
+    [(('a',), 4), (('a', 'a'), 2), (('a', 'b'), 4), (('a', 'b', 'b'), 2), (('a', 'b', 'c'), 4),
+     (('a', 'c'), 4), (('b',), 4), (('b', 'b'), 2), (('b', 'c'), 4), (('c',), 4), (('c', 'a'), 3),
+     (('c', 'a', 'b'), 2), (('c', 'a', 'b', 'c'), 2), (('c', 'a', 'c'), 2), (('c', 'b'), 3),
      (('c', 'b', 'c'), 2), (('c', 'c'), 2)]
 
 
@@ -124,7 +124,7 @@ About performance
 
 All algorithms are implemented in Python and not in a C extension. The library
 does not require any dependency and can thus be installed in almost any Python
-environment. 
+environment.
 
 The performance does increase with pypy and its jit. In one of my benchmark,
 FP-growth went from 100 seconds with cpython to 23 seconds with pypy and relim
@@ -170,3 +170,20 @@ description in:
 Frequent Closed Sequence Mining without Candidate Maintenance, J. Wang, J. Han,
 and C. Li, IEEE Trans. on Knowledge and Data Engineering 19(8):1042-1056, IEEE
 Press, Piscataway, NJ, USA 2007
+
+
+Changelog
+---------
+
+0.1 - 16 Aug 2011
+~~~~~~~~~~~~~~~~~
+
+Initial release!
+
+
+0.2 - 10 Aug 2015
+~~~~~~~~~~~~~~~~~
+
+- Fixed bug with assoc rule mining: some rules matching the confidence
+  threshold were not computed.
+- Fixed bug with the installer: seqmining was not included.

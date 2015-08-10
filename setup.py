@@ -4,7 +4,7 @@ from distutils.core import setup
 
 setup(
     name='pymining',
-    version='0.1',
+    version='0.2',
     description='Small collection of data mining algorithms',
     long_description='''
 pymining is a small collection of data mining algorithms implemented in Python
