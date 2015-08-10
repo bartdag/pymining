@@ -20,7 +20,7 @@ def _freq_seq(sdb, prefix, prefix_support, min_support, freq_seqs):
     if not locally_frequents:
         return
     for (item, support) in locally_frequents:
-        new_prefix = prefix + tuple(item)
+        new_prefix = prefix + (item,)
         new_sdb = _project(sdb, new_prefix)
         _freq_seq(new_sdb, new_prefix, support, min_support, freq_seqs)
 
