@@ -2,7 +2,8 @@
 *.swp
 __pycache__/*
 tags
-build/*
-dist/*
-.tox/*
+/build
+/dist
+/.tox
 MANIFEST
+/pymining.egg-info
