@@ -20,7 +20,7 @@ often include old algorithms that have been surpassed by newer ones.
 Requirements
 ------------
 
-pymining has been tested with Python 2.7 and 3.2.
+pymining has been tested with Python 2.7 and 3.4.
 
 
 Installation
